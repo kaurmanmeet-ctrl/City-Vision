@@ -1,0 +1,24 @@
+services:
+  # Single unified web service – FastAPI serves the React SPA directly.
+  # This eliminates all cross-origin / "Failed to fetch" issues.
+  - type: web
+    name: cityvision
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: |
+      # ── 1. Node / frontend build ──────────────────────────────────────────
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      apt-get install -y nodejs
+      cd frontend && npm ci && npm run build && cd ..
+      # ── 2. Python dependencies ────────────────────────────────────────────
+      pip install --upgrade pip
+      pip install -r backend/requirements-cloud.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DATABASE_URL
+        value: sqlite:///./sih26124.db
+      # No CORS_ORIGINS needed – same origin (frontend + backend on one URL)

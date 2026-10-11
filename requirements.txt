@@ -1,0 +1,20 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+torchvision>=0.15.0
+opencv-python-headless>=4.8.0.76
+ultralytics>=8.0.0
+supervision>=0.25.0
+numpy>=1.24.0
+Pillow>=10.0.0
+PyYAML>=6.0
+requests>=2.31.0
+tqdm>=4.66.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+gunicorn>=21.2.0
+sqlalchemy>=2.0.0
+pydantic>=2.6.0
+python-multipart>=0.0.9
+reportlab>=4.0.0
+geoalchemy2>=0.14.0
+psycopg2-binary>=2.9.9

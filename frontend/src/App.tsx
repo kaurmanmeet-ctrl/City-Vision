@@ -1,0 +1,206 @@
+import React, { useState, useEffect, useCallback } from 'react'
+import type { IncidentSummary } from './types'
+import { useIncidents } from './hooks/useIncidents'
+import { useAnalytics } from './hooks/useAnalytics'
+import { useBuses } from './hooks/useBuses'
+import { useScanManager } from './hooks/useScanManager'
+import { Sidebar, type NavTab, type UserRole } from './components/Navigation/Sidebar'
+import { TopHeader } from './components/Navigation/TopHeader'
+import { HomeView } from './components/Views/HomeView'
+import { LiveDetectionView } from './components/Views/LiveDetectionView'
+import { RoadMapView } from './components/Views/RoadMapView'
+import { ReportsView } from './components/Views/ReportsView'
+import { BusFleetView } from './components/Views/BusFleetView'
+import { AnalyticsView } from './components/Views/AnalyticsView'
+import { TransportAuthorityView } from './components/Views/TransportAuthorityView'
+import { FieldOpsView } from './components/Views/FieldOpsView'
+import { DetailDrawer } from './components/DetailDrawer/DetailDrawer'
+
+export const App: React.FC = () => {
+  const [currentTab, setCurrentTab] = useState<NavTab>('home')
+  const [activeRole, setActiveRole] = useState<UserRole>('command_center')
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [selectedIncident, setSelectedIncident] = useState<IncidentSummary | null>(null)
+  const [lastSyncTime, setLastSyncTime] = useState<string>('Just now')
+
+  // Dark mode state with persistence
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('civicpulse_theme')
+    if (saved) return saved === 'dark'
+    return window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
+  })
+
+  // Collapsible sidebar state with persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('civicpulse_sidebar_collapsed') === 'true'
+  })
+
+  const { incidents, refetch: refetchIncidents } = useIncidents({})
+  const { analytics, refetch: refetchAnalytics } = useAnalytics()
+  const { buses, refetch: refetchBuses } = useBuses()
+
+  const handleRefreshAll = useCallback(() => {
+    refetchIncidents()
+    refetchAnalytics()
+    refetchBuses()
+  }, [refetchIncidents, refetchAnalytics, refetchBuses])
+
+  // Scan state lifted to root level
+  const scanManager = useScanManager({ onScanComplete: handleRefreshAll })
+
+  // Synchronize dark mode class on body
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark')
+      localStorage.setItem('civicpulse_theme', 'dark')
+    } else {
+      document.body.classList.remove('dark')
+      localStorage.setItem('civicpulse_theme', 'light')
+    }
+  }, [isDarkMode])
+
+  // Synchronize sidebar width css variable on document element
+  useEffect(() => {
+    const width = isSidebarCollapsed ? '64px' : '240px'
+    document.documentElement.style.setProperty('--sidebar-current-width', width)
+    localStorage.setItem('civicpulse_sidebar_collapsed', isSidebarCollapsed ? 'true' : 'false')
+  }, [isSidebarCollapsed])
+
+  const toggleTheme = useCallback(() => {
+    setIsDarkMode((prev) => !prev)
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarCollapsed((prev) => !prev)
+  }, [])
+
+  // Track sync time
+  useEffect(() => {
+    const now = new Date()
+    setLastSyncTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+  }, [incidents, analytics, buses])
+
+  // Keep selectedIncident synchronized with latest polled data
+  useEffect(() => {
+    if (selectedIncident) {
+      const match = incidents.find((i) => i.incident_id === selectedIncident.incident_id)
+      if (match) {
+        setSelectedIncident(match)
+      }
+    }
+  }, [incidents])
+
+  const activeBusesCount = buses.length || analytics?.active_buses || 24
+
+  return (
+    <div className="city-vision-app">
+      {/* 1. Left Collapsible Navigation Rail */}
+      <Sidebar
+        activeTab={currentTab}
+        onSelectTab={setCurrentTab}
+        activeBusesCount={activeBusesCount}
+        isScanProcessing={scanManager.scanStatus.status === 'PROCESSING'}
+        scanEventsCount={scanManager.scanStatus.events_dispatched}
+        activeRole={activeRole}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+      />
+
+      {/* 2. Main Content Area */}
+      <div className="app-main-content">
+        {/* Fixed Top Header */}
+        <TopHeader
+          activeBusesCount={activeBusesCount}
+          lastUpdated={lastSyncTime}
+          onRefreshAll={handleRefreshAll}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          scanManager={scanManager}
+          onNavigateTab={setCurrentTab}
+          activeRole={activeRole}
+          onRoleChange={setActiveRole}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={toggleSidebar}
+        />
+
+        {/* Dynamic Main View */}
+        <main className="main-view-container">
+          {currentTab === 'home' && (
+            <HomeView
+              analytics={analytics}
+              incidents={incidents}
+              buses={buses}
+              onNavigateTab={setCurrentTab}
+              onSelectIncident={setSelectedIncident}
+            />
+          )}
+
+          {currentTab === 'live-detection' && (
+            <LiveDetectionView
+              scanManager={scanManager}
+              onSelectIncident={setSelectedIncident}
+              onRefresh={handleRefreshAll}
+            />
+          )}
+
+          {currentTab === 'road-map' && (
+            <RoadMapView
+              incidents={incidents}
+              buses={buses}
+              onSelectIncident={setSelectedIncident}
+            />
+          )}
+
+          {currentTab === 'transport-authority' && (
+            <TransportAuthorityView
+              incidents={incidents}
+              buses={buses}
+              onSelectIncident={setSelectedIncident}
+            />
+          )}
+
+          {currentTab === 'field-ops' && (
+            <FieldOpsView
+              incidents={incidents}
+              onSelectIncident={setSelectedIncident}
+              onRefresh={handleRefreshAll}
+            />
+          )}
+
+          {currentTab === 'reports' && (
+            <ReportsView
+              incidents={incidents}
+              onSelectIncident={setSelectedIncident}
+              onRefresh={handleRefreshAll}
+            />
+          )}
+
+          {currentTab === 'bus-fleet' && (
+            <BusFleetView
+              buses={buses}
+              onNavigateTab={setCurrentTab}
+            />
+          )}
+
+          {currentTab === 'analytics' && (
+            <AnalyticsView
+              analytics={analytics}
+              buses={buses}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* 3. Global Floating Detail Drawer */}
+      <DetailDrawer
+        incidentSummary={selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+        onRefresh={handleRefreshAll}
+      />
+    </div>
+  )
+}
+
+export default App

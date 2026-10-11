@@ -1,0 +1,15 @@
+/* CivicPulse Application Specific CSS */
+
+.app-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Video Canvas Reticle Styling */
+.reticle-box {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Clean minimal transitions */
+button, a, input, select {
+  font-family: inherit;
+}
